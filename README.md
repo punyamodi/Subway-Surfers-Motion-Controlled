@@ -21,6 +21,33 @@ https://github.com/punyamodi/Subway-Surfers-Motion-Controlled/assets/68418104/84
 
 ---
 
+## How It Works
+
+Each camera frame travels through a fixed pipeline before any key is pressed.
+
+```mermaid
+flowchart LR
+    A([Webcam Frame]) --> B[Flip horizontal]
+    B --> C[MediaPipe\nPose Inference]
+    C --> D{Pose\ndetected?}
+    D -- No --> Z([Skip frame])
+    D -- Yes --> E[Extract 9\nkey landmarks]
+    E --> F[Horizontal\nzone check]
+    E --> G[Jump velocity\ncheck]
+    E --> H[Duck body\nratio check]
+    E --> I[Wrist distance\ncheck]
+    F --> J[Cooldown filter]
+    G --> J
+    H --> J
+    I --> J
+    J --> K[Key press\ndispatch]
+    K --> L([Game action])
+```
+
+The shoulder midpoint determines which of the three horizontal zones the player occupies. A zone transition fires a left or right arrow key. Jump is detected from the upward velocity of the shoulder midpoint sampled every 50 ms. Duck fires when the nose-to-hip Euclidean distance divided by torso length drops below a configurable ratio. Roll fires when both wrists are within a pixel threshold of each other. Every gesture has an independent cooldown timer so accidental rapid repeats are suppressed.
+
+---
+
 ## Gesture Reference
 
 | Gesture | Body Movement | Game Action |
@@ -71,14 +98,49 @@ python main.py
 
 ## Project Structure
 
+```mermaid
+flowchart TD
+    subgraph Inputs
+        CAM([Webcam])
+        CFG[config.py\nAll thresholds]
+    end
+
+    subgraph Core
+        DET[detector.py\nPoseDetector\nMediaPipe Pose]
+        GES[gestures.py\nGestureEngine\nCooldown logic]
+        CTL[controller.py\nInputController\npyautogui]
+    end
+
+    subgraph Output
+        VIS[visualizer.py\nFrame overlay\nFPS · zones · labels]
+        GAME([Subway Surfers])
+        WIN([Display window])
+    end
+
+    MAIN[main.py\nApplication\nMain loop]
+
+    CAM --> MAIN
+    MAIN --> DET
+    DET --> GES
+    GES --> CTL
+    CTL --> GAME
+    DET --> VIS
+    GES --> VIS
+    MAIN --> VIS
+    VIS --> WIN
+    CFG -.->|thresholds| DET
+    CFG -.->|thresholds| GES
+    CFG -.->|display config| VIS
+```
+
 ```
 Subway-Surfers-Motion-Controlled/
-├── main.py          # Application entry point and main loop
-├── config.py        # All tunable parameters in one place
-├── detector.py      # MediaPipe Pose wrapper and PoseLandmarks dataclass
-├── gestures.py      # Stateful gesture engine with per-gesture cooldowns
-├── controller.py    # Key press dispatcher (pyautogui)
-├── visualizer.py    # Webcam overlay rendering
+├── main.py          Application entry point and main loop
+├── config.py        All tunable parameters in one place
+├── detector.py      MediaPipe Pose wrapper and PoseLandmarks dataclass
+├── gestures.py      Stateful gesture engine with per-gesture cooldowns
+├── controller.py    Key press dispatcher (pyautogui)
+├── visualizer.py    Webcam overlay rendering
 └── requirements.txt
 ```
 
